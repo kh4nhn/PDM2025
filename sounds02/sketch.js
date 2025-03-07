@@ -1,81 +1,65 @@
-let synth;
-let filter;
-let filterFreq = 1000;
-let bassFilter;
-let bassFreq = 200;
+let synth1, filt, rev, polySynth;
+let activeKey = null;
+let keyNotes = { 'a': 'A4', 's': 'B4', 'd': 'C5', 'f': 'D5' };
+let keyNotes1 = { 'q': 'D4', 'w': 'F4', 'e': 'A4' };
 let filterSlider;
-let bassSlider;
 
 function setup() {
-  createCanvas(400, 250);
-  synth = new p5.PolySynth();
+  createCanvas(600, 300);
+  filt = new Tone.Filter(1500, "lowpass").toDestination();
+  rev = new Tone.Reverb(2).connect(filt);
+  synth1 = new Tone.Synth({
+    envelope: { attack: 0.1, decay: 0.2, sustain: 0.9, release: 0.3 }
+  }).connect(rev);
+  polySynth = new Tone.PolySynth(Tone.Synth).connect(rev);
+  polySynth.set({
+    envelope: { attack: 0.1, decay: 0.1, sustain: 1, release: 0.1 },
+    oscillator: { type: 'sawtooth' }
+  });
+  polySynth.volume.value = -6;
   
-  
-  filter = new p5.Filter('lowpass');
-  filter.freq(filterFreq);
-  filter.res(5);
-  
-  bassFilter = new p5.Filter('lowpass');
-  bassFilter.freq(bassFreq);
-  bassFilter.res(5);
-  
-  
-  synth.disconnect();  
-  synth.connect(filter);
-  filter.connect(bassFilter);
-  bassFilter.connect(); 
-  
-  
-  filterSlider = createSlider(200, 5000, filterFreq);
-  filterSlider.position(100, 180);
+  filterSlider = createSlider(200, 5000, 1500, 1);
+  filterSlider.position(20, height - 30);
   filterSlider.style('width', '200px');
-  
-  bassSlider = createSlider(50, 500, bassFreq);
-  bassSlider.position(100, 210);
-  bassSlider.style('width', '200px');
 }
 
 function draw() {
   background(220);
-  textAlign(CENTER, CENTER);
-  textSize(16);
-  text('Press A - K to play notes', width / 2, height / 3);
-  text('Filter Frequency: ' + filterFreq + ' Hz', width / 2, height / 2);
-  text('Bass Filter Frequency: ' + bassFreq + ' Hz', width / 2, height / 2 + 30);
-  
-  
-  filterFreq = filterSlider.value();
-  bassFreq = bassSlider.value();
-  filter.freq(filterFreq);
-  bassFilter.freq(bassFreq);
+  drawKeyboard();
+  filt.frequency.value = filterSlider.value();
+  text("Adjust Filter Frequency", 20, height - 40);
 }
 
-let keyMap = {
-  'A': 'C4',
-  'S': 'D4',
-  'D': 'E4',
-  'F': 'F4',
-  'G': 'G4',
-  'H': 'A4',
-  'J': 'B4',
-  'K': 'C5'
-};
+function drawKeyboard() {
+  let keys = ['a', 's', 'd', 'f', 'q', 'w', 'e'];
+  let keyWidth = width / keys.length;
+  for (let i = 0; i < keys.length; i++) {
+    fill(activeKey === keys[i] ? 'blue' : 'white');
+    rect(i * keyWidth, height / 2, keyWidth - 2, 80, 5);
+    fill(0);
+    textAlign(CENTER, CENTER);
+    text(keys[i].toUpperCase(), i * keyWidth + keyWidth / 2, height / 2 + 40);
+  }
+}
 
 function keyPressed() {
-  // Resume audio context on first user interaction
-  let audioContext = getAudioContext();
-  if (audioContext.state !== 'running') {
-    audioContext.resume();
-  }
-
-  if (key) { 
-    let note = keyMap[key.toUpperCase()];
-    if (note) {
-      synth.play(note, 0.5, 0, 0.5);
-    }
+  let pitch = keyNotes[key];
+  let pitch1 = keyNotes1[key];
+  if (pitch && key !== activeKey) {
+    synth1.triggerRelease();
+    activeKey = key;
+    synth1.triggerAttack(pitch);
+  } else if (pitch1) {
+    activeKey = key;
+    polySynth.triggerAttack(pitch1);
   }
 }
 
 function keyReleased() {
-  synth.noteRelease(); 
+  let pitch1 = keyNotes1[key];
+  if (key === activeKey) {
+    synth1.triggerRelease();
+    polySynth.triggerRelease(pitch1);
+    activeKey = null;
+  }
 }
